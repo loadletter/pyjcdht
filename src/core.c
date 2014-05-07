@@ -28,16 +28,9 @@
 /* The call-back function is called by the DHT whenever something
    interesting happens.  Right now, it only happens when we get a new value or
    when a search completes, but this may be extended in future versions. */
-static void
-callback(void *closure,
-         int event,
-         const unsigned char *info_hash,
-         const void *data, size_t data_len)
+static PyObject* JCDHT_callback_stub(JCDHT* self, PyObject* args)
 {
-	if(event == DHT_EVENT_SEARCH_DONE)
-		printf("Search done.\n");
-	else if(event == DHT_EVENT_VALUES)
-		printf("Received %d values.\n", (int)(data_len / 6));
+	Py_RETURN_NONE;
 }
 
 int main(int argc, char **argv)
@@ -343,11 +336,11 @@ int main(int argc, char **argv)
 		{
 			buf[rc] = '\0';
 			rc = dht_periodic(buf, rc, (struct sockaddr*)&from, fromlen,
-			                  &tosleep, callback, NULL);
+			                  &tosleep, callback_search, NULL); //TODO: replace NULL with object
 		}
 		else
 		{
-			rc = dht_periodic(NULL, 0, NULL, 0, &tosleep, callback, NULL);
+			rc = dht_periodic(NULL, 0, NULL, 0, &tosleep, callback_search, NULL); //TODO: replace NULL with object
 		}
 		if(rc < 0)
 		{
@@ -371,9 +364,9 @@ int main(int argc, char **argv)
 		if(searching)
 		{
 			if(s >= 0)
-				dht_search(hash, 0, AF_INET, callback, NULL);
+				dht_search(hash, 0, AF_INET, callback_search, NULL); //TODO: replace NULL with object
 			if(s6 >= 0)
-				dht_search(hash, 0, AF_INET6, callback, NULL);
+				dht_search(hash, 0, AF_INET6, callback_search, NULL); //TODO: replace NULL with object
 			searching = 0;
 		}
 
@@ -479,8 +472,24 @@ dht_random_bytes(void *buf, size_t size)
 	return rc;
 }
 
+static void callback_search(void *self, int event, unsigned char *info_hash,
+                                                 void *data, size_t data_len)
+{
+#if PY_MAJOR_VERSION < 3
+	PyObject_CallMethod((PyObject*)self, "on_search", "issK", event, info_hash, data, data_len)
+#else
+	PyObject_CallMethod((PyObject*)self, "on_search", "iyyK", event, info_hash, data, data_len
+#endif
+}
+
 PyMethodDef DHT_methods[] =
 {
+	{
+		"on_search", (PyCFunction)JCDHT_callback_stub, METH_VARARGS,
+		"on_search(event, info_hash, data, data_len)\n"
+		"Callback called when receiving peers or search done, "
+		"default implementation does nothing."
+	}
 };
 
 PyTypeObject JCDHTType = {
