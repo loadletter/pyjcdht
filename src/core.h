@@ -1,5 +1,5 @@
-#ifndef JCDHT_H
-#define JCDHT_H
+#ifndef CORE_H
+#define CORE_H
 
 #include <Python.h>
 #include "dht/dht.h"
@@ -19,5 +19,5 @@ typedef struct {
 
 void JCDHT_install_dict(void);
 
-#endif /* JCDHT_H */
+#endif /* CORE_H */
 

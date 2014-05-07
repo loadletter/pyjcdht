@@ -18,7 +18,7 @@
 #include <netdb.h>
 #include <sys/signal.h>
 
-#include "jcdht.h"
+#include "core.h"
 
 /* The call-back function is called by the DHT whenever something
    interesting happens.  Right now, it only happens when we get a new value or
