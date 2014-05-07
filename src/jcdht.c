@@ -409,7 +409,7 @@ dht_blacklisted(const struct sockaddr *sa, int salen)
 
 /* We need to provide a reasonably strong cryptographic hashing function.
    Here's how we'd do it if we had RSA's MD5 code. */
-#if 0
+#ifdef ENABLE_OPENSSL
 void
 dht_hash(void *hash_return, int hash_size,
          const void *v1, int len1,
@@ -469,4 +469,71 @@ dht_random_bytes(void *buf, size_t size)
 	return rc;
 }
 
-//PyMethodDef JCDHT_methods[] =
+PyMethodDef DHT_methods[] =
+{
+};
+
+PyTypeObject JCDHTType = {
+#if PY_MAJOR_VERSION >= 3
+	PyVarObject_HEAD_INIT(NULL, 0)
+#else
+	PyObject_HEAD_INIT(NULL)
+	0,                         /*ob_size*/
+#endif
+	"DHT",                     /*tp_name*/
+	sizeof(JCDHT),           /*tp_basicsize*/
+	0,                         /*tp_itemsize*/
+	(destructor)JCDHT_dealloc, /*tp_dealloc*/
+	0,                         /*tp_print*/
+	0,                         /*tp_getattr*/
+	0,                         /*tp_setattr*/
+	0,                         /*tp_compare*/
+	0,                         /*tp_repr*/
+	0,                         /*tp_as_number*/
+	0,                         /*tp_as_sequence*/
+	0,                         /*tp_as_mapping*/
+	0,                         /*tp_hash */
+	0,                         /*tp_call*/
+	0,                         /*tp_str*/
+	0,                         /*tp_getattro*/
+	0,                         /*tp_setattro*/
+	0,                         /*tp_as_buffer*/
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /*tp_flags*/
+	"JCDHT object",          /* tp_doc */
+	0,                         /* tp_traverse */
+	0,                         /* tp_clear */
+	0,                         /* tp_richcompare */
+	0,                         /* tp_weaklistoffset */
+	0,                         /* tp_iter */
+	0,                         /* tp_iternext */
+	DHT_methods,               /* tp_methods */
+	0,                         /* tp_members */
+	0,                         /* tp_getset */
+	0,                         /* tp_base */
+	0,                         /* tp_dict */
+	0,                         /* tp_descr_get */
+	0,                         /* tp_descr_set */
+	0,                         /* tp_dictoffset */
+	(initproc)JCDHT_init,    /* tp_init */
+	0,                         /* tp_alloc */
+	JCDHT_new,               /* tp_new */
+};
+
+void JCDHT_install_dict()
+{
+#define SET(name)                                            \
+	PyObject* obj_##name = PyLong_FromLong(DHT_##name);        \
+	PyDict_SetItemString(dict, #name, obj_##name);             \
+	Py_DECREF(obj_##name);
+
+	PyObject* dict = PyDict_New();
+	SET(EVENT_NONE)
+	SET(EVENT_VALUES)
+	SET(EVENT_VALUES6)
+	SET(EVENT_SEARCH_DONE)
+	SET(EVENT_SEARCH_DONE6)
+
+#undef SET
+
+	ToxCoreType.tp_dict = dict;
+}
