@@ -405,7 +405,7 @@ dht_blacklisted(const struct sockaddr *sa, int salen)
 }
 
 /* We need to provide a reasonably strong cryptographic hashing function.
-   Here's how we'd do it if we had RSA's MD5 code. */
+   Here's how we'd do it if we had OpenSSL's SHA1 code. */
 #ifdef ENABLE_OPENSSL
 void
 dht_hash(void *hash_return, int hash_size,
@@ -413,15 +413,14 @@ dht_hash(void *hash_return, int hash_size,
          const void *v2, int len2,
          const void *v3, int len3)
 {
-	static MD5_CTX ctx;
-	MD5Init(&ctx);
-	MD5Update(&ctx, v1, len1);
-	MD5Update(&ctx, v2, len2);
-	MD5Update(&ctx, v3, len3);
-	MD5Final(&ctx);
-	if(hash_size > 16)
-		memset((char*)hash_return + 16, 0, hash_size - 16);
-	memcpy(hash_return, ctx.digest, hash_size > 16 ? 16 : hash_size);
+	SHA_CTX sha;
+
+	SHA1_Init(&sha);
+	SHA1_Update(&sha, v1, len1);
+	SHA1_Update(&sha, v2, len2);
+	SHA1_Update(&sha, v3, len3);
+
+	SHA1_Final(hash_return, &sha);
 }
 #else
 /* But for this example, we might as well use something weaker. */
