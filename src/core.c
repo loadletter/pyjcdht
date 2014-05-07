@@ -18,6 +18,11 @@
 #include <netdb.h>
 #include <sys/signal.h>
 
+#ifdef ENABLE_OPENSSL
+#include <openssl/sha.h>
+#include <openssl/rand.h>
+#endif
+
 #include "core.h"
 
 /* The call-back function is called by the DHT whenever something
@@ -34,7 +39,6 @@ callback(void *closure,
 	else if(event == DHT_EVENT_VALUES)
 		printf("Received %d values.\n", (int)(data_len / 6));
 }
-
 
 int main(int argc, char **argv)
 {
@@ -455,7 +459,13 @@ int
 dht_random_bytes(void *buf, size_t size)
 {
 	int fd, rc, save;
-
+	
+#ifdef ENABLE_OPENSSL
+	rc = RAND_pseudo_bytes(buf, size);
+	if(rc == 1)
+		return size;
+#endif
+	
 	fd = open("/dev/urandom", O_RDONLY);
 	if(fd < 0)
 		return -1;
