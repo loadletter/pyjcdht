@@ -4,6 +4,12 @@
 #include <Python.h>
 #include "dht/dht.h"
 
+#define CHECK_DHT(self)                                        \
+	if ((self)->dht == NULL) {                                   \
+		PyErr_SetString(DHTError, "jcdht object killed.");     \
+		return NULL;                                               \
+	}
+  
 typedef struct {
 	int s, s6, port;
 	int have_id;

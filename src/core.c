@@ -25,9 +25,8 @@
 
 #include "core.h"
 
-/* The call-back function is called by the DHT whenever something
-   interesting happens.  Right now, it only happens when we get a new value or
-   when a search completes, but this may be extended in future versions. */
+PyObject* DHTError;
+
 static PyObject* JCDHT_callback_stub(JCDHT* self, PyObject* args)
 {
 	Py_RETURN_NONE;
@@ -313,6 +312,8 @@ usage:
 
 static PyObject* JCDHT_do(JCDHT *self, PyObject* args)
 {
+	CHECK_DHT(self);
+	
 	struct timeval tv;
 	fd_set readfds;
 	unsigned char buf[4096];
@@ -485,11 +486,37 @@ dht_random_bytes(void *buf, size_t size)
 static void callback_search(void *self, int event, unsigned char *info_hash,
                                                  void *data, size_t data_len)
 {
+	CHECK_DHT(self);
 #if PY_MAJOR_VERSION < 3
 	PyObject_CallMethod((PyObject*)self, "on_search", "issK", event, info_hash, data, data_len)
 #else
 	PyObject_CallMethod((PyObject*)self, "on_search", "iyyK", event, info_hash, data, data_len
 #endif
+}
+
+static PyObject* JCDHT_new(PyTypeObject *type, PyObject* args, PyObject* kwds)
+{
+	JCDHT* self = (JCDHT*)type->tp_alloc(type, 0);
+	self->dht = NULL;
+
+	// We don't care about subclass's arguments
+	if (init_helper(self, NULL) == -1)
+	{
+		return NULL;
+	}
+
+	return (PyObject*)self;
+}
+
+static int JCDHT_dealloc(JCDHT* self)
+{
+	if (self->tox)
+	{
+		dht_uninit();
+		free(self->dht);
+		self->dht = NULL;
+	}
+	return 0;
 }
 
 PyMethodDef DHT_methods[] =
