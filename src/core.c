@@ -275,8 +275,6 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
-	init_signals();
-
 	/* For bootstrapping, we need an initial list of nodes.  This could be
 	   hard-wired, but can also be obtained from the nodes key of a torrent
 	   file, or from the PORT bittorrent message.
@@ -293,90 +291,7 @@ int main(int argc, char **argv)
 		usleep(random() % 100000);
 	}
 
-	while(1)
-	{
-		struct timeval tv;
-		fd_set readfds;
-		unsigned char buf[4096];
-		tv.tv_sec = tosleep;
-		tv.tv_usec = random() % 1000000;
-
-		FD_ZERO(&readfds);
-		if(s >= 0)
-			FD_SET(s, &readfds);
-		if(s6 >= 0)
-			FD_SET(s6, &readfds);
-		rc = select(s > s6 ? s + 1 : s6 + 1, &readfds, NULL, NULL, &tv);
-		if(rc < 0)
-		{
-			if(errno != EINTR)
-			{
-				perror("select");
-				sleep(1);
-			}
-		}
-
-		if(exiting)
-			break;
-
-		if(rc > 0)
-		{
-			fromlen = sizeof(from);
-			if(s >= 0 && FD_ISSET(s, &readfds))
-				rc = recvfrom(s, buf, sizeof(buf) - 1, 0,
-				              (struct sockaddr*)&from, &fromlen);
-			else if(s6 >= 0 && FD_ISSET(s6, &readfds))
-				rc = recvfrom(s6, buf, sizeof(buf) - 1, 0,
-				              (struct sockaddr*)&from, &fromlen);
-			else
-				abort();
-		}
-
-		if(rc > 0)
-		{
-			buf[rc] = '\0';
-			rc = dht_periodic(buf, rc, (struct sockaddr*)&from, fromlen,
-			                  &tosleep, callback_search, NULL); //TODO: replace NULL with object
-		}
-		else
-		{
-			rc = dht_periodic(NULL, 0, NULL, 0, &tosleep, callback_search, NULL); //TODO: replace NULL with object
-		}
-		if(rc < 0)
-		{
-			if(errno == EINTR)
-			{
-				continue;
-			}
-			else
-			{
-				perror("dht_periodic");
-				if(rc == EINVAL || rc == EFAULT)
-					abort();
-				tosleep = 1;
-			}
-		}
-
-		/* This is how you trigger a search for a torrent hash.  If port
-		   (the second argument) is non-zero, it also performs an announce.
-		   Since peers expire announced data after 30 minutes, it's a good
-		   idea to reannounce every 28 minutes or so. */
-		if(searching)
-		{
-			if(s >= 0)
-				dht_search(hash, 0, AF_INET, callback_search, NULL); //TODO: replace NULL with object
-			if(s6 >= 0)
-				dht_search(hash, 0, AF_INET6, callback_search, NULL); //TODO: replace NULL with object
-			searching = 0;
-		}
-
-		/* For debugging, or idle curiosity. */
-		if(dumping)
-		{
-			dht_dump_tables(stdout);
-			dumping = 0;
-		}
-	}
+	/*while(1) do stuff */
 
 	{
 		struct sockaddr_in sin[500];
@@ -394,6 +309,102 @@ usage:
 	printf("Usage: dht-example [-q] [-4] [-6] [-i filename] [-b address]...\n"
 	       "                   port [address port]...\n");
 	exit(1);
+}
+
+static PyObject* JCDHT_do(JCDHT *self, PyObject* args)
+{
+	struct timeval tv;
+	fd_set readfds;
+	unsigned char buf[4096];
+	int s = self->dht->s;
+	int s6 = self->dht->s6;
+	int port = self->dht->port;
+	int have_id = self->dht->have_id;
+	unsigned char *myid = self->dht->myid;
+	int ipv4 = self->dht->ipv4;
+	int ipv6 = self->dht->ipv6;
+	
+	tv.tv_sec = self->dht->tosleep;
+	tv.tv_usec = random() % 1000000;
+
+	FD_ZERO(&readfds);
+	if(s >= 0)
+		FD_SET(s, &readfds);
+	if(s6 >= 0)
+		FD_SET(s6, &readfds);
+	rc = select(s > s6 ? s + 1 : s6 + 1, &readfds, NULL, NULL, &tv);
+	if(rc < 0)
+	{
+		if(errno != EINTR)
+		{
+			perror("select");
+			sleep(1);
+		}
+	}
+
+	if(rc > 0)
+	{
+		fromlen = sizeof(from);
+		if(s >= 0 && FD_ISSET(s, &readfds))
+			rc = recvfrom(s, buf, sizeof(buf) - 1, 0,
+			              (struct sockaddr*)&from, &fromlen);
+		else if(s6 >= 0 && FD_ISSET(s6, &readfds))
+			rc = recvfrom(s6, buf, sizeof(buf) - 1, 0,
+			              (struct sockaddr*)&from, &fromlen);
+		else
+			{
+				PyErr_SetString(DHTError, "socket error");
+				return NULL;
+			}
+	}
+
+	if(rc > 0)
+	{
+		buf[rc] = '\0';
+		rc = dht_periodic(buf, rc, (struct sockaddr*)&from, fromlen,
+		                  &self->dht->tosleep, callback_search, NULL); //TODO: replace NULL with object
+	}
+	else
+	{
+		rc = dht_periodic(NULL, 0, NULL, 0, &self->dht->tosleep, callback_search, NULL); //TODO: replace NULL with object
+	}
+	if(rc < 0)
+	{
+		if(errno == EINTR)
+		{
+			Py_RETURN_NONE;
+		}
+		else
+		{
+			perror("dht_periodic");
+			if(rc == EINVAL || rc == EFAULT)
+			{
+				PyErr_SetString(DHTError, "failed to run dht_periodic");
+				return NULL;
+			}
+			self->dht->tosleep = 1;
+		}
+	}
+
+	/* This is how you trigger a search for a torrent hash.  If port
+	   (the second argument) is non-zero, it also performs an announce.
+	   Since peers expire announced data after 30 minutes, it's a good
+	   idea to reannounce every 28 minutes or so. */
+	/*if(searching)
+	{
+		if(s >= 0)
+			dht_search(hash, 0, AF_INET, callback_search, NULL); //TODO: replace NULL with object
+		if(s6 >= 0)
+			dht_search(hash, 0, AF_INET6, callback_search, NULL); //TODO: replace NULL with object
+		searching = 0;
+	}*/
+
+	if (PyErr_Occurred())
+	{
+		return NULL;
+	}
+	
+	Py_RETURN_NONE;
 }
 
 /* Functions called by the DHT. */
@@ -488,6 +499,11 @@ PyMethodDef DHT_methods[] =
 		"on_search(event, info_hash, data, data_len)\n"
 		"Callback called when receiving peers or search done, "
 		"default implementation does nothing."
+	},
+	{
+		"do", (PyCFunction)JCDHT_do, METH_NOARGS,
+		"do()\n"
+		"The main loop."
 	}
 };
 
