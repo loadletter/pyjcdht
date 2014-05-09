@@ -487,10 +487,11 @@ static void callback_search(void *self, int event, unsigned char *info_hash,
                                                  void *data, size_t data_len)
 {
 	CHECK_DHT(self);
+	
 #if PY_MAJOR_VERSION < 3
-	PyObject_CallMethod((PyObject*)self, "on_search", "issK", event, info_hash, data, data_len)
+	PyObject_CallMethod((PyObject*)self, "on_search", "issK", event, info_hash, data, data_len); //TODO: fix format
 #else
-	PyObject_CallMethod((PyObject*)self, "on_search", "iyyK", event, info_hash, data, data_len
+	PyObject_CallMethod((PyObject*)self, "on_search", "iyyK", event, info_hash, data, data_len); //TODO: fix format
 #endif
 }
 
@@ -523,21 +524,65 @@ static int init_helper(JCDHT* self, PyObject* args)
 {
 	if(!self->dht)
 	{
+		unsigned seed;
 		JCDHT *dht = malloc(sizeof(JCDHT));
 		if(!dht)
 		{
-			PyErr_SetString(DHTError, "malloc error");
-			return NULL;
+			PyErr_SetString(DHTError, "dht malloc error");
+			return -1;
 		}
 		
 		dht->s = -1;
 		dht->s6 = -1;
-		dht->port = 6881;
 		dht->have_id = 0;
-		//dht->myid;
-		dht->ipv4 = 1;
-		dht->ipv6 = 1;
 		dht->tosleep = 0;
+		
+		dht_random_bytes(&seed, sizeof(seed));
+		srandom(seed);
+		
+		self->dht = dht;
+		
+		return 0;
+	}
+	
+	if(args) //TODO: add bind to address support
+	{
+		char *id;
+		int idlen, port, sockflags = 3;
+#if PY_MAJOR_VERSION < 3
+		if(!PyArg_ParseTuple(args, "s#i|i", id, &idlen, &port, &sockflags))
+#else
+		if(!PyArg_ParseTuple(args, "y#i|i", id, &idlen, &port, &sockflags))
+#endif
+		{
+			PyErr_SetString(PyExcValueError, "Failed to parse arguments");
+			return -1;
+		}
+
+		if(idlen != 20)
+		{
+			PyErr_SetString(PyExcValueError, "ID must be 20 bytes, generated randomly and then should be saved/reused");
+			return -1;
+		}
+		
+		self->dht->ipv4 = (DHT_ENABLE_IPV4 & sockflags) == DHT_ENABLE_IPV4;
+		self->dht->ipv6 = (DHT_ENABLE_IPV6 & sockflags) == DHT_ENABLE_IPV6;
+		if(ipv4 == 0 && ipv6 == 0)
+		{
+			PyErr_SetString(PyExcValueError, "At least one network stack must be enabled");
+			return -1;
+		}
+		
+		if(port <= 0 || port >= 0x10000)
+		{
+			PyErr_SetString(PyExcValueError, "Wrong port value");
+			return -1;
+		}
+		self->dht->port = port;
+
+		//TODO: add socket creation/binding/dht initialization
+		
+		self->have_id = 1;
 	}
 }
 
@@ -615,6 +660,8 @@ void JCDHT_install_dict()
 	SET(EVENT_VALUES6)
 	SET(EVENT_SEARCH_DONE)
 	SET(EVENT_SEARCH_DONE6)
+	SET(ENABLE_IPV4)
+	SET(ENABLE_IPV6)
 
 #undef SET
 

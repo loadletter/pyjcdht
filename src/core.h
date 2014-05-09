@@ -25,5 +25,10 @@ typedef struct {
 
 void JCDHT_install_dict(void);
 
+enum {
+	DHT_ENABLE_IPV4 = 1,
+	DHT_ENABLE_IPV6 = 2
+};
+
 #endif /* CORE_H */
 
