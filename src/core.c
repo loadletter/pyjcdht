@@ -519,6 +519,28 @@ static int JCDHT_dealloc(JCDHT* self)
 	return 0;
 }
 
+static int init_helper(JCDHT* self, PyObject* args)
+{
+	if(!self->dht)
+	{
+		JCDHT *dht = malloc(sizeof(JCDHT));
+		if(!dht)
+		{
+			PyErr_SetString(DHTError, "malloc error");
+			return NULL;
+		}
+		
+		dht->s = -1;
+		dht->s6 = -1;
+		dht->port = 6881;
+		dht->have_id = 0;
+		//dht->myid;
+		dht->ipv4 = 1;
+		dht->ipv6 = 1;
+		dht->tosleep = 0;
+	}
+}
+
 PyMethodDef DHT_methods[] =
 {
 	{
