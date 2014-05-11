@@ -407,6 +407,49 @@ static PyObject* JCDHT_do(JCDHT *self, PyObject* args)
 	Py_RETURN_NONE;
 }
 
+static PyObject* JCDHT_ping(JCDHT* self, PyObject* args)
+{
+	CHECK_DHT(self);
+	
+	char *addr;
+	int port, rc = -1;
+	char buf[16];
+	struct sockaddr_in sin;
+	struct sockaddr_in6 sin6;
+	
+	if(!PyArg_ParseTuple(args, "si", addr, &port))
+	{
+		PyErr_SetString(PyExcValueError, "Failed to parse arguments");
+		return NULL;
+	}
+	
+	if(inet_pton(AF_INET, optarg, buf) == 1)
+	{
+		memcpy(&sin.sin_addr, buf, 4);
+		sin.sin_port = htons(port);
+		rc = dht_ping_node ((struct sockaddr*)&sin, sizeof (sin));
+	}
+	else if(inet_pton(AF_INET6, optarg, buf) == 1)
+	{
+		memcpy(&sin6.sin6_addr, buf, 16);
+		sin6.sin6_port = htons(port);
+		rc = dht_ping_node ((struct sockaddr*)&sin6, sizeof (sin6));
+	}
+	else
+	{
+		PyErr_SetString(PyExcValueError, "Failed to parse address");
+		return NULL;
+	}
+	
+	if(rc > 0)
+	{
+		Py_RETURN_TRUE;
+	}
+	
+	Py_RETURN_FALSE;
+}
+
+
 /* Functions called by the DHT. */
 
 int
@@ -675,6 +718,14 @@ PyMethodDef DHT_methods[] =
 		"do", (PyCFunction)JCDHT_do, METH_NOARGS,
 		"do()\n"
 		"The main loop."
+	},
+	{
+		"ping", (PyCFunction)JCDHT_ping, METH_VARARGS,
+		"ping(adress, port)n"
+		"This is the main bootstrapping primitive."
+		"You pass it an address at which you believe that a DHT node may be living, "
+		"and a query will be sent.  If a node replies, and if there is space in the routing table, "
+		"it will be inserted."
 	}
 };
 
