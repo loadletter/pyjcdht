@@ -11,7 +11,7 @@
 	}
   
 typedef struct {
-	int s, s6, port;
+	int s, s6;
 	int have_id;
 	unsigned char myid[20];
 	time_t tosleep;

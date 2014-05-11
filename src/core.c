@@ -319,7 +319,6 @@ static PyObject* JCDHT_do(JCDHT *self, PyObject* args)
 	unsigned char buf[4096];
 	int s = self->dht->s;
 	int s6 = self->dht->s6;
-	int port = self->dht->port;
 	int have_id = self->dht->have_id;
 	unsigned char *myid = self->dht->myid;
 	int ipv4 = self->dht->ipv4;
@@ -590,7 +589,6 @@ static int init_helper(JCDHT* self, PyObject* args)
 			PyErr_SetString(PyExcValueError, "Wrong port value");
 			return -1;
 		}
-		dht->port = port; //TODO: is dht->port actually needed after binding?
 
 		if(dht->ipv4)
 		{
