@@ -488,9 +488,9 @@ static void callback_search(void *self, int event, unsigned char *info_hash,
 	CHECK_DHT(self);
 	
 #if PY_MAJOR_VERSION < 3
-	PyObject_CallMethod((PyObject*)self, "on_search", "issK", event, info_hash, data, data_len); //TODO: fix format
+	PyObject_CallMethod((PyObject*)self, "on_search", "is#s#", event, info_hash, 20, data, data_len);
 #else
-	PyObject_CallMethod((PyObject*)self, "on_search", "iyyK", event, info_hash, data, data_len); //TODO: fix format
+	PyObject_CallMethod((PyObject*)self, "on_search", "iy#y#", event, info_hash, 20, data, data_len);
 #endif
 }
 
