@@ -427,6 +427,10 @@ static int init_helper(JCDHT* self, PyObject* args)
 			return -1;
 		}
 
+#ifdef DEBUG
+		dht_debug = stdout;
+#endif		
+		
 		if(dht->ipv4)
 		{
 			dht->s = socket(PF_INET, SOCK_DGRAM, 0);
