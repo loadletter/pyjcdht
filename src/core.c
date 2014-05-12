@@ -461,8 +461,7 @@ dht_blacklisted(const struct sockaddr *sa, int salen)
 /* We need to provide a reasonably strong cryptographic hashing function.
    Here's how we'd do it if we had OpenSSL's SHA1 code. */
 #ifdef ENABLE_OPENSSL
-void
-dht_hash(void *hash_return, int hash_size,
+void dht_hash(void *hash_return, int hash_size,
          const void *v1, int len1,
          const void *v2, int len2,
          const void *v3, int len3)
@@ -478,8 +477,7 @@ dht_hash(void *hash_return, int hash_size,
 }
 #else
 /* But for this example, we might as well use something weaker. */
-void
-dht_hash(void *hash_return, int hash_size,
+void dht_hash(void *hash_return, int hash_size,
          const void *v1, int len1,
          const void *v2, int len2,
          const void *v3, int len3)
@@ -501,8 +499,7 @@ dht_hash(void *hash_return, int hash_size,
 }
 #endif
 
-int
-dht_random_bytes(void *buf, size_t size)
+int dht_random_bytes(void *buf, size_t size)
 {
 	int fd, rc, save;
 	
@@ -523,6 +520,58 @@ dht_random_bytes(void *buf, size_t size)
 	errno = save;
 
 	return rc;
+}
+
+static PyObject* JCDHT_search(JCDHT* self, PyObject* args)
+{
+	CHECK_DHT(self);
+	
+	JCDHT *dht = self->dht;
+	char *infohash;
+	int hashlen, rc, port = 0;
+	
+#if PY_MAJOR_VERSION < 3
+	rc = PyArg_ParseTuple(args, "s#|i", infohash, &hashlen, &port);
+#else
+	rc = PyArg_ParseTuple(args, "y#|i", infohash, &hashlen, &port);
+#endif
+
+	if(!rc)
+	{
+		PyErr_SetString(PyExcValueError, "Failed to parse arguments");
+		return NULL;
+	}
+	
+	if(hashlen != 20)
+	{
+		PyErr_SetString(PyExcValueError, "ID must be 20 bytes");
+		return NULL;
+	}
+	
+	if(port < 0 || port >= 0x10000)
+	{
+		PyErr_SetString(PyExcValueError, "Wrong port value");
+		return NULL;
+	}
+
+	if(dht->s >= 0)
+	{
+		rc = dht_search(infohash, port, AF_INET, callback_search, self);
+		if(rc == -1)
+		{
+			Py_RETURN_FALSE;
+		}
+	}
+	if(dht->s6 >= 0)
+	{
+		rc = dht_search(infohash, port, AF_INET6, callback_search, self);
+		if(rc == -1)
+		{
+			Py_RETURN_FALSE;
+		}
+	}
+	
+	Py_RETURN_TRUE;
 }
 
 static void callback_search(void *self, int event, unsigned char *info_hash,
@@ -721,11 +770,19 @@ PyMethodDef DHT_methods[] =
 	},
 	{
 		"ping", (PyCFunction)JCDHT_ping, METH_VARARGS,
-		"ping(adress, port)n"
+		"ping(adress, port)\n"
 		"This is the main bootstrapping primitive."
 		"You pass it an address at which you believe that a DHT node may be living, "
 		"and a query will be sent.  If a node replies, and if there is space in the routing table, "
-		"it will be inserted."
+		"it will be inserted, up to 9 nodes can be inserted for every call of do()."
+	},
+	{
+		"search", (PyCFunction)JCDHT_search, METH_VARARGS,
+		"search(infohash, port)\n"
+		"Starts a search, up to 1024 searches can be in progress at a given time."
+		"Port is optional, if set to something different than 0 it will announce the peer to the network, "
+		"and the port will represent the TCP socket used by the client."
+		"Return false if max number of searches is reached."
 	}
 };
 
@@ -793,5 +850,5 @@ void JCDHT_install_dict()
 
 #undef SET
 
-	ToxCoreType.tp_dict = dict;
+	JCDHTType.tp_dict = dict;
 }
