@@ -73,6 +73,155 @@ static void callback_search(void *self, int event, const unsigned char *info_has
 #endif
 }
 
+static int init_helper(JCDHT* self, PyObject* args)
+{
+	if(!self->dht)
+	{
+		unsigned seed;
+		DHT *dht = malloc(sizeof(JCDHT));
+		if(!dht)
+		{
+			PyErr_SetString(DHTError, "dht malloc error");
+			return -1;
+		}
+		
+		dht->s = -1;
+		dht->s6 = -1;
+		dht->have_id = 0;
+		dht->tosleep = 0;
+		
+		dht_random_bytes(&seed, sizeof(seed));
+		srandom(seed);
+		
+		self->dht = dht;
+		
+		return 0;
+	}
+	
+	if(args) //TODO: add bind to address support
+	{
+		char *id;
+		int rc, idlen, port, sockflags = 3;
+		struct sockaddr_in sin;
+		struct sockaddr_in6 sin6;
+		DHT *dht = self->dht;
+		
+		/* the address that we will bind to */
+		memset(&sin, 0, sizeof(sin));
+		sin.sin_family = AF_INET;
+		memset(&sin6, 0, sizeof(sin6));
+		sin6.sin6_family = AF_INET6;
+		
+#if PY_MAJOR_VERSION < 3
+		if(!PyArg_ParseTuple(args, "s#i|i", id, &idlen, &port, &sockflags))
+#else
+		if(!PyArg_ParseTuple(args, "y#i|i", id, &idlen, &port, &sockflags))
+#endif
+		{
+			PyErr_SetString(PyExc_ValueError, "Failed to parse arguments");
+			return -1;
+		}
+
+		if(idlen != 20)
+		{
+			PyErr_SetString(PyExc_ValueError, "ID must be 20 bytes, generated randomly and then should be saved/reused");
+			return -1;
+		}
+		memcpy(&dht->myid, id, 20);
+		dht->have_id = 1;
+		
+		dht->ipv4 = (DHT_ENABLE_IPV4 & sockflags) == DHT_ENABLE_IPV4;
+		dht->ipv6 = (DHT_ENABLE_IPV6 & sockflags) == DHT_ENABLE_IPV6;
+		if(dht->ipv4 == 0 && dht->ipv6 == 0)
+		{
+			PyErr_SetString(PyExc_ValueError, "At least one network stack must be enabled");
+			return -1;
+		}
+		
+		if(port <= 0 || port >= 0x10000)
+		{
+			PyErr_SetString(PyExc_ValueError, "Wrong port value");
+			return -1;
+		}
+
+#ifdef DEBUG
+		dht_debug = stdout;
+#endif		
+		
+		if(dht->ipv4)
+		{
+			dht->s = socket(PF_INET, SOCK_DGRAM, 0);
+			if(dht->s < 0)
+			{
+				perror("socket(IPv4)");
+			}
+		}
+
+		if(dht->ipv6)
+		{
+			dht->s6 = socket(PF_INET6, SOCK_DGRAM, 0);
+			if(dht->s6 < 0)
+			{
+				perror("socket(IPv6)");
+			}
+		}
+
+		if(dht->s < 0 && dht->s6 < 0)
+		{
+			PyErr_SetString(PyExc_IOError, "Error creating sockets");
+			return -1;
+		}
+		
+		if(dht->s >= 0)
+		{
+			sin.sin_port = htons(port);
+			rc = bind(dht->s, (struct sockaddr*)&sin, sizeof(sin));
+			if(rc < 0)
+			{
+				PyErr_SetString(PyExc_IOError, "Error binding IPv4 socket");
+				return -1;
+			}
+		}
+
+		if(dht->s6 >= 0)
+		{
+			int rc;
+			int val = 1;
+
+			rc = setsockopt(dht->s6, IPPROTO_IPV6, IPV6_V6ONLY,
+							(char *)&val, sizeof(val));
+			if(rc < 0)
+			{
+				PyErr_SetString(PyExc_IOError, "Error setsockopt(IPV6_V6ONLY)");
+				return -1;
+			}
+
+			/* BEP-32 mandates that we should bind this socket to one of our
+			   global IPv6 addresses.  In this simple example, this only
+			   happens if the user used the -b flag. */
+
+			sin6.sin6_port = htons(port);
+			rc = bind(dht->s6, (struct sockaddr*)&sin6, sizeof(sin6));
+			if(rc < 0)
+			{
+				PyErr_SetString(PyExc_IOError, "Error binding IPv6 socket");
+				return -1;
+			}
+		}
+
+		/* Init the dht.  This sets the socket into non-blocking mode. */
+		rc = dht_init(dht->s, dht->s6, dht->myid, NULL);
+		if(rc < 0)
+		{
+			PyErr_SetString(PyExc_RuntimeError, "Error initializing DHT");
+			return -1;
+		}
+	
+	}
+	
+	return 0;
+}
+
 static PyObject* JCDHT_do(JCDHT *self, PyObject* args)
 {
 	CHECK_DHT(self);
@@ -350,6 +499,12 @@ static PyObject* JCDHT_new(PyTypeObject *type, PyObject* args, PyObject* kwds)
 	return (PyObject*)self;
 }
 
+static int JCDHT_init(JCDHT* self, PyObject* args, PyObject* kwds)
+{
+	// TODO: probably this is wrong
+	return init_helper(self, args);
+}
+
 static int JCDHT_dealloc(JCDHT* self)
 {
 	if (self->dht)
@@ -359,154 +514,6 @@ static int JCDHT_dealloc(JCDHT* self)
 		self->dht = NULL;
 	}
 	return 0;
-}
-
-static int init_helper(JCDHT* self, PyObject* args)
-{
-	if(!self->dht)
-	{
-		unsigned seed;
-		DHT *dht = malloc(sizeof(JCDHT));
-		if(!dht)
-		{
-			PyErr_SetString(DHTError, "dht malloc error");
-			return -1;
-		}
-		
-		dht->s = -1;
-		dht->s6 = -1;
-		dht->have_id = 0;
-		dht->tosleep = 0;
-		
-		dht_random_bytes(&seed, sizeof(seed));
-		srandom(seed);
-		
-		self->dht = dht;
-		
-		return 0;
-	}
-	
-	if(args) //TODO: add bind to address support
-	{
-		char *id;
-		int rc, idlen, port, sockflags = 3;
-		struct sockaddr_in sin;
-		struct sockaddr_in6 sin6;
-		DHT *dht = self->dht;
-		
-		/* the address that we will bind to */
-		memset(&sin, 0, sizeof(sin));
-		sin.sin_family = AF_INET;
-		memset(&sin6, 0, sizeof(sin6));
-		sin6.sin6_family = AF_INET6;
-		
-#if PY_MAJOR_VERSION < 3
-		if(!PyArg_ParseTuple(args, "s#i|i", id, &idlen, &port, &sockflags))
-#else
-		if(!PyArg_ParseTuple(args, "y#i|i", id, &idlen, &port, &sockflags))
-#endif
-		{
-			PyErr_SetString(PyExc_ValueError, "Failed to parse arguments");
-			return -1;
-		}
-
-		if(idlen != 20)
-		{
-			PyErr_SetString(PyExc_ValueError, "ID must be 20 bytes, generated randomly and then should be saved/reused");
-			return -1;
-		}
-		memcpy(&dht->myid, id, 20);
-		dht->have_id = 1;
-		
-		dht->ipv4 = (DHT_ENABLE_IPV4 & sockflags) == DHT_ENABLE_IPV4;
-		dht->ipv6 = (DHT_ENABLE_IPV6 & sockflags) == DHT_ENABLE_IPV6;
-		if(dht->ipv4 == 0 && dht->ipv6 == 0)
-		{
-			PyErr_SetString(PyExc_ValueError, "At least one network stack must be enabled");
-			return -1;
-		}
-		
-		if(port <= 0 || port >= 0x10000)
-		{
-			PyErr_SetString(PyExc_ValueError, "Wrong port value");
-			return -1;
-		}
-
-#ifdef DEBUG
-		dht_debug = stdout;
-#endif		
-		
-		if(dht->ipv4)
-		{
-			dht->s = socket(PF_INET, SOCK_DGRAM, 0);
-			if(dht->s < 0)
-			{
-				perror("socket(IPv4)");
-			}
-		}
-
-		if(dht->ipv6)
-		{
-			dht->s6 = socket(PF_INET6, SOCK_DGRAM, 0);
-			if(dht->s6 < 0)
-			{
-				perror("socket(IPv6)");
-			}
-		}
-
-		if(dht->s < 0 && dht->s6 < 0)
-		{
-			PyErr_SetString(PyExc_IOError, "Error creating sockets");
-			return -1;
-		}
-		
-		if(dht->s >= 0)
-		{
-			sin.sin_port = htons(port);
-			rc = bind(dht->s, (struct sockaddr*)&sin, sizeof(sin));
-			if(rc < 0)
-			{
-				PyErr_SetString(PyExc_IOError, "Error binding IPv4 socket");
-				return -1;
-			}
-		}
-
-		if(dht->s6 >= 0)
-		{
-			int rc;
-			int val = 1;
-
-			rc = setsockopt(dht->s6, IPPROTO_IPV6, IPV6_V6ONLY,
-							(char *)&val, sizeof(val));
-			if(rc < 0)
-			{
-				PyErr_SetString(PyExc_IOError, "Error setsockopt(IPV6_V6ONLY)");
-				return -1;
-			}
-
-			/* BEP-32 mandates that we should bind this socket to one of our
-			   global IPv6 addresses.  In this simple example, this only
-			   happens if the user used the -b flag. */
-
-			sin6.sin6_port = htons(port);
-			rc = bind(dht->s6, (struct sockaddr*)&sin6, sizeof(sin6));
-			if(rc < 0)
-			{
-				PyErr_SetString(PyExc_IOError, "Error binding IPv6 socket");
-				return -1;
-			}
-		}
-
-		/* Init the dht.  This sets the socket into non-blocking mode. */
-		rc = dht_init(dht->s, dht->s6, dht->myid, NULL);
-		if(rc < 0)
-		{
-			PyErr_SetString(PyExc_RuntimeError, "Error initializing DHT");
-			return -1;
-		}
-		
-		//TODO: is there something left?
-	}
 }
 
 PyMethodDef DHT_methods[] =
