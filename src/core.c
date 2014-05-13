@@ -2,7 +2,9 @@
    You are free to cut'n'paste from it to your heart's content. */
 
 /* For crypt */
+#if defined(_GNU_SOURCE) && !defined(ENABLE_OPENSSL)
 #define _GNU_SOURCE
+#endif
 
 #include <Python.h>
 #include <stdio.h>
@@ -27,33 +29,49 @@
 
 PyObject* DHTError;
 
+//TODO: implement get_nodes and nodes
+
+/* For bootstrapping, we need an initial list of nodes.  This could be
+   hard-wired, but can also be obtained from the nodes key of a torrent
+   file, or from the PORT bittorrent message.
+
+   Dht_ping_node is the brutal way of bootstrapping -- it actually
+   sends a message to the peer.  If you're going to bootstrap from
+   a massive number of nodes (for example because you're restoring from
+   a dump) and you already know their ids, it's better to use
+   dht_insert_node.  If the ids are incorrect, the DHT will recover. */
+
+
+/*{
+	struct sockaddr_in sin[500];
+	struct sockaddr_in6 sin6[500];
+	int num = 500, num6 = 500;
+	int i;
+	i = dht_get_nodes(sin, &num, sin6, &num6);
+	printf("Found %d (%d + %d) good nodes.\n", i, num, num6);
+}*/
+
+
 static PyObject* JCDHT_callback_stub(JCDHT* self, PyObject* args)
 {
 	Py_RETURN_NONE;
 }
+
+static void callback_search(void *self, int event, const unsigned char *info_hash,
+                                                const void *data, size_t data_len)
+{
+	if(((JCDHT*)self)->dht == NULL)
+	{
+		PyErr_SetString(DHTError, "jcdht object killed."); 
+		return;
+	}
 	
-	//TODO: implement get_nodes and nodes
-
-	/* For bootstrapping, we need an initial list of nodes.  This could be
-	   hard-wired, but can also be obtained from the nodes key of a torrent
-	   file, or from the PORT bittorrent message.
-
-	   Dht_ping_node is the brutal way of bootstrapping -- it actually
-	   sends a message to the peer.  If you're going to bootstrap from
-	   a massive number of nodes (for example because you're restoring from
-	   a dump) and you already know their ids, it's better to use
-	   dht_insert_node.  If the ids are incorrect, the DHT will recover. */
-
-
-	/*{
-		struct sockaddr_in sin[500];
-		struct sockaddr_in6 sin6[500];
-		int num = 500, num6 = 500;
-		int i;
-		i = dht_get_nodes(sin, &num, sin6, &num6);
-		printf("Found %d (%d + %d) good nodes.\n", i, num, num6);
-	}*/
-
+#if PY_MAJOR_VERSION < 3
+	PyObject_CallMethod((PyObject*)self, "on_search", "is#s#", event, info_hash, 20, data, data_len);
+#else
+	PyObject_CallMethod((PyObject*)self, "on_search", "iy#y#", event, info_hash, 20, data, data_len);
+#endif
+}
 
 static PyObject* JCDHT_do(JCDHT *self, PyObject* args)
 {
@@ -64,10 +82,9 @@ static PyObject* JCDHT_do(JCDHT *self, PyObject* args)
 	unsigned char buf[4096];
 	int s = self->dht->s;
 	int s6 = self->dht->s6;
-	int have_id = self->dht->have_id;
-	unsigned char *myid = self->dht->myid;
-	int ipv4 = self->dht->ipv4;
-	int ipv6 = self->dht->ipv6;
+    struct sockaddr_storage from;
+    socklen_t fromlen;
+	int rc;
 	
 	tv.tv_sec = self->dht->tosleep;
 	tv.tv_usec = random() % 1000000;
@@ -164,7 +181,7 @@ static PyObject* JCDHT_ping(JCDHT* self, PyObject* args)
 	
 	if(!PyArg_ParseTuple(args, "si", addr, &port))
 	{
-		PyErr_SetString(PyExcValueError, "Failed to parse arguments");
+		PyErr_SetString(PyExc_ValueError, "Failed to parse arguments");
 		return NULL;
 	}
 	
@@ -182,7 +199,7 @@ static PyObject* JCDHT_ping(JCDHT* self, PyObject* args)
 	}
 	else
 	{
-		PyErr_SetString(PyExcValueError, "Failed to parse address");
+		PyErr_SetString(PyExc_ValueError, "Failed to parse address");
 		return NULL;
 	}
 	
@@ -271,8 +288,8 @@ static PyObject* JCDHT_search(JCDHT* self, PyObject* args)
 {
 	CHECK_DHT(self);
 	
-	JCDHT *dht = self->dht;
-	char *infohash;
+	DHT *dht = self->dht;
+	unsigned char *infohash;
 	int hashlen, rc, port = 0;
 	
 #if PY_MAJOR_VERSION < 3
@@ -283,19 +300,19 @@ static PyObject* JCDHT_search(JCDHT* self, PyObject* args)
 
 	if(!rc)
 	{
-		PyErr_SetString(PyExcValueError, "Failed to parse arguments");
+		PyErr_SetString(PyExc_ValueError, "Failed to parse arguments");
 		return NULL;
 	}
 	
 	if(hashlen != 20)
 	{
-		PyErr_SetString(PyExcValueError, "ID must be 20 bytes");
+		PyErr_SetString(PyExc_ValueError, "ID must be 20 bytes");
 		return NULL;
 	}
 	
 	if(port < 0 || port >= 0x10000)
 	{
-		PyErr_SetString(PyExcValueError, "Wrong port value");
+		PyErr_SetString(PyExc_ValueError, "Wrong port value");
 		return NULL;
 	}
 
@@ -319,18 +336,6 @@ static PyObject* JCDHT_search(JCDHT* self, PyObject* args)
 	Py_RETURN_TRUE;
 }
 
-static void callback_search(void *self, int event, unsigned char *info_hash,
-                                                 void *data, size_t data_len)
-{
-	CHECK_DHT(self);
-	
-#if PY_MAJOR_VERSION < 3
-	PyObject_CallMethod((PyObject*)self, "on_search", "is#s#", event, info_hash, 20, data, data_len);
-#else
-	PyObject_CallMethod((PyObject*)self, "on_search", "iy#y#", event, info_hash, 20, data, data_len);
-#endif
-}
-
 static PyObject* JCDHT_new(PyTypeObject *type, PyObject* args, PyObject* kwds)
 {
 	JCDHT* self = (JCDHT*)type->tp_alloc(type, 0);
@@ -347,7 +352,7 @@ static PyObject* JCDHT_new(PyTypeObject *type, PyObject* args, PyObject* kwds)
 
 static int JCDHT_dealloc(JCDHT* self)
 {
-	if (self->tox)
+	if (self->dht)
 	{
 		dht_uninit();
 		free(self->dht);
@@ -361,7 +366,7 @@ static int init_helper(JCDHT* self, PyObject* args)
 	if(!self->dht)
 	{
 		unsigned seed;
-		JCDHT *dht = malloc(sizeof(JCDHT));
+		DHT *dht = malloc(sizeof(JCDHT));
 		if(!dht)
 		{
 			PyErr_SetString(DHTError, "dht malloc error");
@@ -384,10 +389,10 @@ static int init_helper(JCDHT* self, PyObject* args)
 	if(args) //TODO: add bind to address support
 	{
 		char *id;
-		int idlen, port, sockflags = 3;
+		int rc, idlen, port, sockflags = 3;
 		struct sockaddr_in sin;
 		struct sockaddr_in6 sin6;
-		JCDHT *dht = self->dht;
+		DHT *dht = self->dht;
 		
 		/* the address that we will bind to */
 		memset(&sin, 0, sizeof(sin));
@@ -401,29 +406,29 @@ static int init_helper(JCDHT* self, PyObject* args)
 		if(!PyArg_ParseTuple(args, "y#i|i", id, &idlen, &port, &sockflags))
 #endif
 		{
-			PyErr_SetString(PyExcValueError, "Failed to parse arguments");
+			PyErr_SetString(PyExc_ValueError, "Failed to parse arguments");
 			return -1;
 		}
 
 		if(idlen != 20)
 		{
-			PyErr_SetString(PyExcValueError, "ID must be 20 bytes, generated randomly and then should be saved/reused");
+			PyErr_SetString(PyExc_ValueError, "ID must be 20 bytes, generated randomly and then should be saved/reused");
 			return -1;
 		}
 		memcpy(&dht->myid, id, 20);
-		self->have_id = 1;
+		dht->have_id = 1;
 		
 		dht->ipv4 = (DHT_ENABLE_IPV4 & sockflags) == DHT_ENABLE_IPV4;
 		dht->ipv6 = (DHT_ENABLE_IPV6 & sockflags) == DHT_ENABLE_IPV6;
-		if(ipv4 == 0 && ipv6 == 0)
+		if(dht->ipv4 == 0 && dht->ipv6 == 0)
 		{
-			PyErr_SetString(PyExcValueError, "At least one network stack must be enabled");
+			PyErr_SetString(PyExc_ValueError, "At least one network stack must be enabled");
 			return -1;
 		}
 		
 		if(port <= 0 || port >= 0x10000)
 		{
-			PyErr_SetString(PyExcValueError, "Wrong port value");
+			PyErr_SetString(PyExc_ValueError, "Wrong port value");
 			return -1;
 		}
 
@@ -455,7 +460,7 @@ static int init_helper(JCDHT* self, PyObject* args)
 			return -1;
 		}
 		
-		if(s >= 0)
+		if(dht->s >= 0)
 		{
 			sin.sin_port = htons(port);
 			rc = bind(dht->s, (struct sockaddr*)&sin, sizeof(sin));
@@ -466,7 +471,7 @@ static int init_helper(JCDHT* self, PyObject* args)
 			}
 		}
 
-		if(s6 >= 0)
+		if(dht->s6 >= 0)
 		{
 			int rc;
 			int val = 1;

@@ -2,7 +2,7 @@ from distutils.core import setup, Extension
 from subprocess import Popen, PIPE
 
 def supports_openssl():
-	h = Popen("ldconfig -p | grep openssl", shell=True, stdout=PIPE)
+	h = Popen("/sbin/ldconfig -p | grep openssl", shell=True, stdout=PIPE)
 	out, err = h.communicate()
 	return 'openssl' in str(out)
 
