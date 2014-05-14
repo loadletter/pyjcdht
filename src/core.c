@@ -544,7 +544,8 @@ PyMethodDef DHT_methods[] =
 		"Port is optional, if set to something different than 0 it will announce the peer to the network, "
 		"and the port will represent the TCP socket used by the client."
 		"Return false if max number of searches is reached."
-	}
+	},
+	{NULL}
 };
 
 PyTypeObject JCDHTType = {
