@@ -521,7 +521,7 @@ PyMethodDef DHT_methods[] =
 	{
 		"on_search", (PyCFunction)JCDHT_callback_stub, METH_VARARGS,
 		"on_search(event, info_hash, data, data_len)\n"
-		"Callback called when receiving peers or search done, "
+		"Callback called when receiving peers or search done,\n"
 		"default implementation does nothing."
 	},
 	{
@@ -533,16 +533,16 @@ PyMethodDef DHT_methods[] =
 		"ping", (PyCFunction)JCDHT_ping, METH_VARARGS,
 		"ping(adress, port)\n"
 		"This is the main bootstrapping primitive."
-		"You pass it an address at which you believe that a DHT node may be living, "
-		"and a query will be sent.  If a node replies, and if there is space in the routing table, "
+		"You pass it an address at which you believe that a DHT node may be living,\n"
+		"and a query will be sent.  If a node replies, and if there is space in the routing table,\n"
 		"it will be inserted, up to 9 nodes can be inserted for every call of do()."
 	},
 	{
 		"search", (PyCFunction)JCDHT_search, METH_VARARGS,
 		"search(infohash, port)\n"
-		"Starts a search, up to 1024 searches can be in progress at a given time."
-		"Port is optional, if set to something different than 0 it will announce the peer to the network, "
-		"and the port will represent the TCP socket used by the client."
+		"Starts a search, up to 1024 searches can be in progress at a given time.\n"
+		"Port is optional, if set to something different than 0 it will announce the peer to the network,\n"
+		"and the port will represent the TCP socket used by the client.\n"
 		"Return false if max number of searches is reached."
 	},
 	{NULL}
