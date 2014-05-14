@@ -75,10 +75,10 @@ static void callback_search(void *self, int event, const unsigned char *info_has
 
 static int init_helper(JCDHT* self, PyObject* args)
 {
-	if(!self->dht)
+	if(self->dht == NULL)
 	{
 		unsigned seed;
-		DHT *dht = malloc(sizeof(JCDHT));
+		DHT *dht = malloc(sizeof(DHT));
 		if(!dht)
 		{
 			PyErr_SetString(DHTError, "dht malloc error");
@@ -573,7 +573,7 @@ PyTypeObject JCDHTType = {
 	0,                         /*tp_setattro*/
 	0,                         /*tp_as_buffer*/
 	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /*tp_flags*/
-	"JCDHT object",          /* tp_doc */
+	"JCDHT object",            /* tp_doc */
 	0,                         /* tp_traverse */
 	0,                         /* tp_clear */
 	0,                         /* tp_richcompare */
@@ -588,9 +588,9 @@ PyTypeObject JCDHTType = {
 	0,                         /* tp_descr_get */
 	0,                         /* tp_descr_set */
 	0,                         /* tp_dictoffset */
-	(initproc)JCDHT_init,    /* tp_init */
+	(initproc)JCDHT_init,      /* tp_init */
 	0,                         /* tp_alloc */
-	JCDHT_new,               /* tp_new */
+	JCDHT_new,                 /* tp_new */
 };
 
 void JCDHT_install_dict()
