@@ -100,7 +100,7 @@ static int init_helper(JCDHT* self, PyObject* args)
 	
 	if(args) //TODO: add bind to address support
 	{
-		char *id;
+		char *id = NULL;
 		int rc, idlen, port, sockflags = 3;
 		struct sockaddr_in sin;
 		struct sockaddr_in6 sin6;
@@ -113,10 +113,11 @@ static int init_helper(JCDHT* self, PyObject* args)
 		sin6.sin6_family = AF_INET6;
 		
 #if PY_MAJOR_VERSION < 3
-		if(!PyArg_ParseTuple(args, "s#i|i", id, &idlen, &port, &sockflags))
+		rc = PyArg_ParseTuple(args, "s#i|i", id, &idlen, &port, &sockflags);
 #else
-		if(!PyArg_ParseTuple(args, "y#i|i", id, &idlen, &port, &sockflags))
+		rc = PyArg_ParseTuple(args, "y#i|i", id, &idlen, &port, &sockflags);
 #endif
+		if(!rc)
 		{
 			PyErr_SetString(PyExc_ValueError, "Failed to parse arguments");
 			return -1;
