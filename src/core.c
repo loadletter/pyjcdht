@@ -100,7 +100,7 @@ static int init_helper(JCDHT* self, PyObject* args)
 	
 	if(args) //TODO: add bind to address support
 	{
-		char *id = NULL;
+		unsigned char *myid = NULL;
 		int rc, idlen, port, sockflags = 3;
 		struct sockaddr_in sin;
 		struct sockaddr_in6 sin6;
@@ -113,9 +113,9 @@ static int init_helper(JCDHT* self, PyObject* args)
 		sin6.sin6_family = AF_INET6;
 		
 #if PY_MAJOR_VERSION < 3
-		rc = PyArg_ParseTuple(args, "s#i|i", id, &idlen, &port, &sockflags);
+		rc = PyArg_ParseTuple(args, "s#i|i", &myid, &idlen, &port, &sockflags);
 #else
-		rc = PyArg_ParseTuple(args, "y#i|i", id, &idlen, &port, &sockflags);
+		rc = PyArg_ParseTuple(args, "y#i|i", &myid, &idlen, &port, &sockflags);
 #endif
 		if(!rc)
 		{
@@ -128,7 +128,7 @@ static int init_helper(JCDHT* self, PyObject* args)
 			PyErr_SetString(PyExc_ValueError, "ID must be 20 bytes, generated randomly and then should be saved/reused");
 			return -1;
 		}
-		memcpy(&dht->myid, id, 20);
+		memcpy(&dht->myid, myid, 20);
 		dht->have_id = 1;
 		
 		dht->ipv4 = (DHT_ENABLE_IPV4 & sockflags) == DHT_ENABLE_IPV4;
@@ -329,19 +329,19 @@ static PyObject* JCDHT_ping(JCDHT* self, PyObject* args)
 	struct sockaddr_in sin;
 	struct sockaddr_in6 sin6;
 	
-	if(!PyArg_ParseTuple(args, "si", addr, &port))
+	if(!PyArg_ParseTuple(args, "si", &addr, &port))
 	{
 		PyErr_SetString(PyExc_ValueError, "Failed to parse arguments");
 		return NULL;
 	}
 	
-	if(inet_pton(AF_INET, optarg, buf) == 1)
+	if(inet_pton(AF_INET, addr, buf) == 1)
 	{
 		memcpy(&sin.sin_addr, buf, 4);
 		sin.sin_port = htons(port);
 		rc = dht_ping_node ((struct sockaddr*)&sin, sizeof (sin));
 	}
-	else if(inet_pton(AF_INET6, optarg, buf) == 1)
+	else if(inet_pton(AF_INET6, addr, buf) == 1)
 	{
 		memcpy(&sin6.sin6_addr, buf, 16);
 		sin6.sin6_port = htons(port);
@@ -443,9 +443,9 @@ static PyObject* JCDHT_search(JCDHT* self, PyObject* args)
 	int hashlen, rc, port = 0;
 	
 #if PY_MAJOR_VERSION < 3
-	rc = PyArg_ParseTuple(args, "s#|i", infohash, &hashlen, &port);
+	rc = PyArg_ParseTuple(args, "s#|i", &infohash, &hashlen, &port);
 #else
-	rc = PyArg_ParseTuple(args, "y#|i", infohash, &hashlen, &port);
+	rc = PyArg_ParseTuple(args, "y#|i", &infohash, &hashlen, &port);
 #endif
 
 	if(!rc)
