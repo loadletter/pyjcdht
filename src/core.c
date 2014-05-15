@@ -60,6 +60,12 @@ static PyObject* JCDHT_callback_stub(JCDHT* self, PyObject* args)
 static void callback_search(void *self, int event, const unsigned char *info_hash,
                                                 const void *data, size_t data_len)
 {
+	//TODO: convert data to list of tuples
+	if(self == NULL)
+	{
+		PyErr_SetString(DHTError, "danger to manifold."); 
+		return;
+	}
 	if(((JCDHT*)self)->dht == NULL)
 	{
 		PyErr_SetString(DHTError, "jcdht object killed."); 
@@ -146,9 +152,9 @@ static int init_helper(JCDHT* self, PyObject* args)
 		}
 
 #ifdef DEBUG
-		dht_debug = stdout;
-#endif		
-		
+		dht_debug = stderr;
+#endif
+
 		if(dht->ipv4)
 		{
 			dht->s = socket(PF_INET, SOCK_DGRAM, 0);
@@ -274,11 +280,11 @@ static PyObject* JCDHT_do(JCDHT *self, PyObject* args)
 	{
 		buf[rc] = '\0';
 		rc = dht_periodic(buf, rc, (struct sockaddr*)&from, fromlen,
-		                  &self->dht->tosleep, callback_search, NULL); //TODO: replace NULL with object
+		                  &self->dht->tosleep, callback_search, self); //TODO: replace NULL with object
 	}
 	else
 	{
-		rc = dht_periodic(NULL, 0, NULL, 0, &self->dht->tosleep, callback_search, NULL); //TODO: replace NULL with object
+		rc = dht_periodic(NULL, 0, NULL, 0, &self->dht->tosleep, callback_search, self); //TODO: replace NULL with object
 	}
 	if(rc < 0)
 	{
@@ -298,18 +304,9 @@ static PyObject* JCDHT_do(JCDHT *self, PyObject* args)
 		}
 	}
 
-	/* This is how you trigger a search for a torrent hash.  If port
-	   (the second argument) is non-zero, it also performs an announce.
-	   Since peers expire announced data after 30 minutes, it's a good
-	   idea to reannounce every 28 minutes or so. */
-	/*if(searching)
-	{
-		if(s >= 0)
-			dht_search(hash, 0, AF_INET, callback_search, NULL); //TODO: replace NULL with object
-		if(s6 >= 0)
-			dht_search(hash, 0, AF_INET6, callback_search, NULL); //TODO: replace NULL with object
-		searching = 0;
-	}*/
+#ifdef DEBUG
+	fflush(stderr);
+#endif
 
 	if (PyErr_Occurred())
 	{
