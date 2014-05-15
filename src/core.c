@@ -337,14 +337,16 @@ static PyObject* JCDHT_ping(JCDHT* self, PyObject* args)
 	
 	if(inet_pton(AF_INET, addr, buf) == 1)
 	{
-		memcpy(&sin.sin_addr, buf, 4);
+		memcpy(&sin.sin_addr.s_addr, buf, 4);
 		sin.sin_port = htons(port);
+		sin.sin_family = AF_INET;
 		rc = dht_ping_node ((struct sockaddr*)&sin, sizeof (sin));
 	}
 	else if(inet_pton(AF_INET6, addr, buf) == 1)
 	{
-		memcpy(&sin6.sin6_addr, buf, 16);
+		memcpy(&sin6.sin6_addr.s6_addr, buf, 16);
 		sin6.sin6_port = htons(port);
+		sin6.sin6_family = AF_INET6;
 		rc = dht_ping_node ((struct sockaddr*)&sin6, sizeof (sin6));
 	}
 	else
