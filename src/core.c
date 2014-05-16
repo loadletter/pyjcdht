@@ -198,8 +198,8 @@ static int init_helper(JCDHT* self, PyObject* args)
 		memcpy(&dht->myid, myid, 20);
 		dht->have_id = 1;
 		
-		dht->ipv4 = (DHT_ENABLE_IPV4 & sockflags) == DHT_ENABLE_IPV4;
-		dht->ipv6 = (DHT_ENABLE_IPV6 & sockflags) == DHT_ENABLE_IPV6;
+		dht->ipv4 = (DHT_IPV4 & sockflags) == DHT_IPV4;
+		dht->ipv6 = (DHT_IPV6 & sockflags) == DHT_IPV6;
 		if(dht->ipv4 == 0 && dht->ipv6 == 0)
 		{
 			PyErr_SetString(PyExc_ValueError, "At least one network stack must be enabled");
@@ -421,6 +421,24 @@ static PyObject* JCDHT_ping(JCDHT* self, PyObject* args)
 	Py_RETURN_FALSE;
 }
 
+static PyObject* JCDHT_nodes(JCDHT* self, PyObject* args)
+{
+	CHECK_DHT(self);
+	
+	int family, goodn, dubiousn, cachedn, incomingn;
+	
+	if(!PyArg_ParseTuple(args, "i", &family))
+	{
+		PyErr_SetString(PyExc_ValueError, "Failed to parse arguments");
+		return NULL;
+	}
+
+	dht_nodes(family == DHT_IPV6 ? AF_INET6 : AF_INET, &goodn, &dubiousn, &cachedn, &incomingn);
+	
+	PyObject *tup = Py_BuildValue("(iiii)", goodn, dubiousn, cachedn, incomingn);
+	
+	return tup;
+}
 
 /* Functions called by the DHT. */
 
@@ -606,6 +624,14 @@ PyMethodDef DHT_methods[] =
 		"and the port will represent the TCP socket used by the client.\n"
 		"Return false if max number of searches is reached."
 	},
+	{
+		"nodes", (PyCFunction)JCDHT_nodes, METH_VARARGS,
+		"nodes(family)\n"
+		"Return a tuple with the number of good, dubious, cached, incoming nodes.\n"
+		"Family can be either DHT.IPV6 or DHT.IPV4 .\n"
+		"Before starting a search it is recommended to wait until good is at least 4,\n"
+		"and good + dubious is at least 30."
+	},
 	{NULL}
 };
 
@@ -668,8 +694,8 @@ void JCDHT_install_dict()
 	SET(EVENT_VALUES6)
 	SET(EVENT_SEARCH_DONE)
 	SET(EVENT_SEARCH_DONE6)
-	SET(ENABLE_IPV4)
-	SET(ENABLE_IPV6)
+	SET(IPV4)
+	SET(IPV6)
 
 #undef SET
 
