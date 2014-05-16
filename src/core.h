@@ -29,5 +29,7 @@ enum {
 	DHT_IPV6 = 2
 };
 
+#define DHT_GET_NODES_MAX 500
+
 #endif /* CORE_H */
 

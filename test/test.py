@@ -7,14 +7,17 @@ class TestDHT(DHT):
 		try:
 			print "dht.transmissionbt.com:", self.ping("91.121.60.42", 6881)
 			print "router.bittorent.com:", self.ping("67.215.242.138", 6881)
-			print "localhost", self.ping('192.168.1.2', 10000)
+			print "localhost:", self.ping('192.168.1.2', 10000)
 			while True:
 				self.do()
 				if testpeers and not searched:
 					randboot = random.choice(testpeers)
 					print "P:", repr(randboot), apply(self.ping, randboot)
 				nodes = self.nodes(self.IPV4)
-				print "N:", repr(nodes)
+				print "NN:", repr(nodes)
+				n, n6 = self.get_nodes()
+				print "N4:", repr(n)
+				print "N6:", repr(n6)
 				if not searched and nodes[0] >= 4:
 					print "starting search"
 					self.search(testhash)

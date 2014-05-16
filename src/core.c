@@ -31,7 +31,7 @@
 
 PyObject* DHTError;
 
-//TODO: implement get_nodes and nodes
+//TODO: better error checking for inet_ntop
 
 /* For bootstrapping, we need an initial list of nodes.  This could be
    hard-wired, but can also be obtained from the nodes key of a torrent
@@ -440,6 +440,55 @@ static PyObject* JCDHT_nodes(JCDHT* self, PyObject* args)
 	return tup;
 }
 
+static PyObject* JCDHT_get_nodes(JCDHT* self, PyObject* args)
+{
+	CHECK_DHT(self);
+	
+	struct sockaddr_in sin[DHT_GET_NODES_MAX];
+	struct sockaddr_in6 sin6[DHT_GET_NODES_MAX];
+	int num = DHT_GET_NODES_MAX, num6 = DHT_GET_NODES_MAX;
+	char stringbuf[INET6_ADDRSTRLEN];
+	uint16_t portbuf;
+	PyObject *tup;
+	int i;
+
+	dht_get_nodes(sin, &num, sin6, &num6);
+	
+	PyObject *peerlist = PyList_New(num);
+	for(i=0; i<num; i++)
+	{
+		if(inet_ntop(AF_INET, &sin[i].sin_addr.s_addr, stringbuf, sizeof(stringbuf)) == NULL)
+		{
+			perror("inet_ntop");
+			PyErr_SetString(DHTError, "inet_ntop"); 
+			return NULL;
+		}		
+		memcpy(&portbuf, &sin[i].sin_port, sizeof(portbuf));
+		
+		tup = Py_BuildValue("(si)", stringbuf, ntohs(portbuf));
+		PyList_SET_ITEM(peerlist, i, tup);
+	}
+
+	PyObject *peerlist6 = PyList_New(num6);
+	for(i=0; i<num6; i++)
+	{
+		if(inet_ntop(AF_INET, &sin6[i].sin6_addr.s6_addr, stringbuf, sizeof(stringbuf)) == NULL)
+		{
+			perror("inet_ntop");
+			PyErr_SetString(DHTError, "inet_ntop"); 
+			return NULL;
+		}		
+		memcpy(&portbuf, &sin6[i].sin6_port, sizeof(portbuf));
+		
+		tup = Py_BuildValue("(si)", stringbuf, ntohs(portbuf));
+		PyList_SET_ITEM(peerlist6, i, tup);
+	}
+	
+	PyObject *nodes = Py_BuildValue("(OO)", peerlist, peerlist6);
+	
+	return nodes;
+}
+
 /* Functions called by the DHT. */
 
 int
@@ -631,6 +680,11 @@ PyMethodDef DHT_methods[] =
 		"Family can be either DHT.IPV6 or DHT.IPV4 .\n"
 		"Before starting a search it is recommended to wait until good is at least 4,\n"
 		"and good + dubious is at least 30."
+	},
+	{
+		"get_nodes", (PyCFunction)JCDHT_get_nodes, METH_NOARGS,
+		"get_nodes()\n"
+		"Return a tuple like (peerlist, peerlist6)."
 	},
 	{NULL}
 };
