@@ -2,7 +2,6 @@
 #define CORE_H
 
 #include <Python.h>
-#include "dht/dht.h"
 
 #define CHECK_DHT(self)                                        \
 	if ((self)->dht == NULL) {                                   \

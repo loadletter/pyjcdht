@@ -27,6 +27,7 @@
 #endif
 
 #include "core.h"
+#include "dht/dht.h"
 
 PyObject* DHTError;
 
@@ -41,7 +42,6 @@ PyObject* DHTError;
    a massive number of nodes (for example because you're restoring from
    a dump) and you already know their ids, it's better to use
    dht_insert_node.  If the ids are incorrect, the DHT will recover. */
-
 
 /*{
 	struct sockaddr_in sin[500];
