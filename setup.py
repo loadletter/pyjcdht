@@ -8,7 +8,7 @@ def supports_openssl():
 
 sources = ["src/dht.c", "src/core.c", "src/dht/dht.c"]
 libraries = ["crypt"]
-cflags = ["-g", "-Wall"]
+cflags = ["-g", "-Wall", "-DENABLE_VERBOSE"]
 
 if supports_openssl():
 	libraries.append("crypto")

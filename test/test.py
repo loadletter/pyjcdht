@@ -7,7 +7,7 @@ class TestDHT(DHT):
 		try:
 			print "dht.transmissionbt.com:", self.ping("91.121.60.42", 6881)
 			print "router.bittorent.com:", self.ping("67.215.242.138", 6881)
-			print "localhost", self.ping('192.168.1.2', 8000)
+			print "localhost", self.ping('192.168.1.2', 10000)
 			while True:
 				self.do()
 				if not searched and time.time() > starttime + 10:

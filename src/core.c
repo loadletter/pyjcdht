@@ -19,6 +19,7 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <sys/signal.h>
+#include <assert.h>
 
 #ifdef ENABLE_OPENSSL
 #include <openssl/sha.h>
@@ -60,7 +61,6 @@ static PyObject* JCDHT_callback_stub(JCDHT* self, PyObject* args)
 static void callback_search(void *self, int event, const unsigned char *info_hash,
                                                 const void *data, size_t data_len)
 {
-	//TODO: convert data to list of tuples
 	if(self == NULL)
 	{
 		PyErr_SetString(DHTError, "danger to manifold."); 
@@ -72,10 +72,71 @@ static void callback_search(void *self, int event, const unsigned char *info_has
 		return;
 	}
 	
+	Py_ssize_t num_results;
+	switch(event)
+	{
+		case DHT_EVENT_VALUES:
+			num_results = data_len / 6;
+			assert(data_len % 6 == 0);
+			break;
+		case DHT_EVENT_VALUES6:
+			num_results = data_len / 20;
+			assert(data_len % 20 == 0);
+			break;
+		default:
+			num_results = 0;
+			break;
+	}
+	
+	PyObject *peerlist = PyList_New(num_results);
+	char stringbuf[INET6_ADDRSTRLEN];
+	const uint8_t * walk = data;
+	uint16_t portbuf;
+	PyObject *tup;
+	int i;
+	
+	if(event == DHT_EVENT_VALUES)
+	{
+		for(i=0; i<num_results; i++)
+		{
+			if(inet_ntop(AF_INET, walk, stringbuf, sizeof(stringbuf)) == NULL)
+			{
+				perror("inet_ntop");
+				return;
+			}
+			
+			walk += 4;
+			memcpy(&portbuf, walk, sizeof(portbuf));
+			walk += 2;
+			
+			tup = Py_BuildValue("(si)", stringbuf, ntohs(portbuf));
+			PyList_SET_ITEM(peerlist, i, tup);
+		}
+	}
+
+	if(event == DHT_EVENT_VALUES6)
+	{
+		for(i=0; i<num_results; i++)
+		{
+			if(inet_ntop(AF_INET6, walk, stringbuf, sizeof(stringbuf)) == NULL)
+			{
+				perror("inet_ntop");
+				return;
+			}
+			
+			walk += 16;
+			memcpy(&portbuf, walk, sizeof(portbuf));
+			walk += 2;
+			
+			tup = Py_BuildValue("(si)", stringbuf, ntohs(portbuf));
+			PyList_SET_ITEM(peerlist, i, tup);
+		}
+	}
+	
 #if PY_MAJOR_VERSION < 3
-	PyObject_CallMethod((PyObject*)self, "on_search", "is#s#", event, info_hash, 20, data, data_len);
+	PyObject_CallMethod((PyObject*)self, "on_search", "is#O", event, info_hash, 20, peerlist);
 #else
-	PyObject_CallMethod((PyObject*)self, "on_search", "iy#y#", event, info_hash, 20, data, data_len);
+	PyObject_CallMethod((PyObject*)self, "on_search", "iy#O", event, info_hash, 20, peerlist);
 #endif
 }
 
@@ -151,7 +212,7 @@ static int init_helper(JCDHT* self, PyObject* args)
 			return -1;
 		}
 
-#ifdef DEBUG
+#ifdef ENABLE_VERBOSE
 		dht_debug = stderr;
 #endif
 
@@ -304,7 +365,7 @@ static PyObject* JCDHT_do(JCDHT *self, PyObject* args)
 		}
 	}
 
-#ifdef DEBUG
+#ifdef ENABLE_VERBOSE
 	fflush(stderr);
 #endif
 
@@ -520,7 +581,7 @@ PyMethodDef DHT_methods[] =
 {
 	{
 		"on_search", (PyCFunction)JCDHT_callback_stub, METH_VARARGS,
-		"on_search(event, info_hash, data, data_len)\n"
+		"on_search(event, info_hash, peerlist)\n"
 		"Callback called when receiving peers or search done,\n"
 		"default implementation does nothing."
 	},
