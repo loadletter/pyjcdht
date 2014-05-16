@@ -1,3 +1,4 @@
+import sys
 from distutils.core import setup, Extension
 from subprocess import Popen, PIPE
 
@@ -8,7 +9,11 @@ def supports_openssl():
 
 sources = ["src/dht.c", "src/core.c", "src/dht/dht.c"]
 libraries = ["crypt"]
-cflags = ["-g", "-Wall", "-DENABLE_VERBOSE"]
+cflags = ["-g", "-Wall"]
+
+if "--enable-verbose" in sys.argv:
+	cflags.append("-DENABLE_VERBOSE")
+	sys.argv.remove("--enable-verbose")
 
 if supports_openssl():
 	libraries.append("crypto")
