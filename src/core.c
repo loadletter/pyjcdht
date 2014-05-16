@@ -489,6 +489,17 @@ static PyObject* JCDHT_get_nodes(JCDHT* self, PyObject* args)
 	return nodes;
 }
 
+static PyObject* JCDHT_dump(JCDHT* self, PyObject* args)
+{
+	CHECK_DHT(self);
+	
+#ifdef ENABLE_VERBOSE
+	dht_dump_tables(stderr);
+#endif
+
+	Py_RETURN_NONE;
+}
+
 /* Functions called by the DHT. */
 
 int
@@ -685,6 +696,11 @@ PyMethodDef DHT_methods[] =
 		"get_nodes", (PyCFunction)JCDHT_get_nodes, METH_NOARGS,
 		"get_nodes()\n"
 		"Return a tuple like (peerlist, peerlist6)."
+	},
+	{
+		"dump", (PyCFunction)JCDHT_dump, METH_NOARGS,
+		"dump()\n"
+		"Debug function, if compiled with --enable-verbose prints DHT buckets 1to stderr."
 	},
 	{NULL}
 };
