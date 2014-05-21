@@ -165,9 +165,10 @@ static int init_helper(JCDHT* self, PyObject* args)
 		return 0;
 	}
 	
-	if(args) //TODO: add bind to address support
+	if(args)
 	{
 		unsigned char *myid = NULL;
+		char *bind_addr = NULL;
 		int rc, idlen, port, sockflags = 3;
 		struct sockaddr_in sin;
 		struct sockaddr_in6 sin6;
@@ -180,9 +181,9 @@ static int init_helper(JCDHT* self, PyObject* args)
 		sin6.sin6_family = AF_INET6;
 		
 #if PY_MAJOR_VERSION < 3
-		rc = PyArg_ParseTuple(args, "s#i|i", &myid, &idlen, &port, &sockflags);
+		rc = PyArg_ParseTuple(args, "s#i|is", &myid, &idlen, &port, &sockflags, &bind_addr);
 #else
-		rc = PyArg_ParseTuple(args, "y#i|i", &myid, &idlen, &port, &sockflags);
+		rc = PyArg_ParseTuple(args, "y#i|is", &myid, &idlen, &port, &sockflags, &bind_addr);
 #endif
 		if(!rc)
 		{
@@ -211,6 +212,30 @@ static int init_helper(JCDHT* self, PyObject* args)
 			PyErr_SetString(PyExc_ValueError, "Wrong port value");
 			return -1;
 		}
+		
+		if(bind_addr != NULL)
+		{
+			char buf[16];
+			int rc;
+			rc = inet_pton(AF_INET, bind_addr, buf);
+			if(rc == 1)
+			{
+				memcpy(&sin.sin_addr, buf, 4);
+				goto bound;
+			}
+			
+			rc = inet_pton(AF_INET6, bind_addr, buf);
+			if(rc == 1)
+			{
+				memcpy(&sin6.sin6_addr, buf, 16);
+				goto bound;
+			}
+			
+			PyErr_SetString(PyExc_ValueError, "Could not parse bind address");
+			return -1;
+		}
+
+bound:
 
 #ifdef ENABLE_VERBOSE
 		dht_debug = stderr;
