@@ -756,7 +756,13 @@ PyTypeObject JCDHTType = {
 	0,                         /*tp_setattro*/
 	0,                         /*tp_as_buffer*/
 	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /*tp_flags*/
-	"JCDHT object",            /* tp_doc */
+	"JCDHT object\n"
+	"DHT(id, port, sockflags, bind_addr)\n"
+	"Id is the 20 byte DHT peer id, port is the port used for listening.\n"
+	"Sockflags and bind_addr are optional.\n"
+	"Sockflags defines the networks stack to use, default is (DHT.IPV6 | DHT.IPV4) aka both.\n"
+	"Bind addr can be used to listen on a specific network interface, default is all interfaces."
+	"",                        /* tp_doc */
 	0,                         /* tp_traverse */
 	0,                         /* tp_clear */
 	0,                         /* tp_richcompare */
