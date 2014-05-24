@@ -101,7 +101,7 @@ static void callback_search(void *self, int event, const unsigned char *info_has
 		{
 			if(inet_ntop(AF_INET, walk, stringbuf, sizeof(stringbuf)) == NULL)
 			{
-				perror("inet_ntop");
+				PyErr_SetFromErrno(PyExc_OSError);
 				return;
 			}
 			
@@ -120,7 +120,7 @@ static void callback_search(void *self, int event, const unsigned char *info_has
 		{
 			if(inet_ntop(AF_INET6, walk, stringbuf, sizeof(stringbuf)) == NULL)
 			{
-				perror("inet_ntop");
+				PyErr_SetFromErrno(PyExc_OSError);
 				return;
 			}
 			
@@ -366,11 +366,11 @@ static PyObject* JCDHT_do(JCDHT *self, PyObject* args)
 	{
 		buf[rc] = '\0';
 		rc = dht_periodic(buf, rc, (struct sockaddr*)&from, fromlen,
-		                  &self->dht->tosleep, callback_search, self); //TODO: replace NULL with object
+		                  &self->dht->tosleep, callback_search, self);
 	}
 	else
 	{
-		rc = dht_periodic(NULL, 0, NULL, 0, &self->dht->tosleep, callback_search, self); //TODO: replace NULL with object
+		rc = dht_periodic(NULL, 0, NULL, 0, &self->dht->tosleep, callback_search, self);
 	}
 	if(rc < 0)
 	{
@@ -484,8 +484,7 @@ static PyObject* JCDHT_get_nodes(JCDHT* self, PyObject* args)
 	{
 		if(inet_ntop(AF_INET, &sin[i].sin_addr.s_addr, stringbuf, sizeof(stringbuf)) == NULL)
 		{
-			perror("inet_ntop");
-			PyErr_SetString(DHTError, "inet_ntop"); 
+			PyErr_SetFromErrno(PyExc_OSError); 
 			return NULL;
 		}		
 		memcpy(&portbuf, &sin[i].sin_port, sizeof(portbuf));
@@ -499,8 +498,7 @@ static PyObject* JCDHT_get_nodes(JCDHT* self, PyObject* args)
 	{
 		if(inet_ntop(AF_INET, &sin6[i].sin6_addr.s6_addr, stringbuf, sizeof(stringbuf)) == NULL)
 		{
-			perror("inet_ntop");
-			PyErr_SetString(DHTError, "inet_ntop"); 
+			PyErr_SetFromErrno(PyExc_OSError);
 			return NULL;
 		}		
 		memcpy(&portbuf, &sin6[i].sin6_port, sizeof(portbuf));
